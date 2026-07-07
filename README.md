@@ -14,8 +14,7 @@
 
   <h3 align="center">AI Resume Analyzer</h3>
 
-    </div>
-</div>
+
 
 ## 📋 <a name="table">Table of Contents</a>
 
