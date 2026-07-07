@@ -11,34 +11,6 @@
 </div>
 
 
-
-
-
-
-<div align="center">
-  <img src="./public/banner.png" alt="AI Resume Analyzer Banner" />
-
-  <br />
-  <br />
-
-  <div>
-    <img src="https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB" />
-    <img src="https://img.shields.io/badge/Tailwind_CSS-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white" />
-    <img src="https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white" />
-    <img src="https://img.shields.io/badge/Puter.js-6C63FF?style=for-the-badge" />
-  </div>
-
-  <h3 align="center">AI Resume Analyzer</h3>
-
-  <p align="center">
-    AI-powered Resume Analyzer that helps job seekers optimize resumes,
-    get ATS-style feedback, and match resumes with job descriptions.
-  </p>
-</div>
-
-
-
-
 # AI Resume Analyzer
 
 AI Resume Analyzer is a web application that helps users evaluate resumes against job descriptions using AI-powered feedback and ATS-style scoring.
