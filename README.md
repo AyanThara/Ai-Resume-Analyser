@@ -115,12 +115,6 @@ npm run dev
 
 Open [http://localhost:5173](http://localhost:5173) in your browser to view the project.
 
-## <a name="links">🔗 Assets</a>
-
-Assets and snippets used in the project can be found in the **[video kit](https://jsm.dev/resumind-kit)**.
-
-<a href="https://jsm.dev/resumind-kit" target="_blank">
-  <img src="public/readme/videokit.webp" alt="Video Kit Banner">
 </a>
 
 </a>'''
