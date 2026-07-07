@@ -1,15 +1,21 @@
 <div align="center">
-  <img src="./public/readme/hero.webp" alt="AI Resume Analyzer Banner" />
 
-  <br />
-  <br />
+<img src="./public/readme/hero.webp" alt="Project Banner" />
 
-  <img src="https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB" />
-  <img src="https://img.shields.io/badge/Tailwind_CSS-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white" />
-  <img src="https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white" />
-  <img src="https://img.shields.io/badge/Puter.js-5B4BFF?style=for-the-badge" />
+<br />
+
+<img src="https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB" />
+<img src="https://img.shields.io/badge/Tailwind_CSS-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white" />
+<img src="https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white" />
+<img src="https://img.shields.io/badge/Puter.js-5B4BFF?style=for-the-badge" />
+
+<h3 align="center">AI Resume Analyzer</h3>
+
+<p align="center">
+AI-powered Resume Analyzer built with React, TypeScript, Tailwind CSS, and Puter.js.
+</p>
+
 </div>
-
 
 # AI Resume Analyzer
 
