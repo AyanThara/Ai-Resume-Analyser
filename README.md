@@ -90,8 +90,7 @@ http://localhost:5173
 ```
 
 ## Screenshots
-
-Add screenshots here after deployment.
+will add deployment screen shots soon...
 
 ## Future Improvements
 
