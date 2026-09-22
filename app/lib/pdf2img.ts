@@ -35,7 +35,7 @@ export async function convertPdfToImage(
         const pdf = await lib.getDocument({ data: arrayBuffer }).promise;
         const page = await pdf.getPage(1);
 
-        const viewport = page.getViewport({ scale: 4 });
+        const viewport = page.getViewport({ scale: 2.5 });
         const canvas = document.createElement("canvas");
         const context = canvas.getContext("2d");
 
@@ -49,31 +49,33 @@ export async function convertPdfToImage(
 
         await page.render({ canvasContext: context!, viewport }).promise;
 
+        // Generate a self-contained base64 JPEG data URL to eliminate Puter FS dependency and avoid object URL leaks
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+
         return new Promise((resolve) => {
             canvas.toBlob(
                 (blob) => {
                     if (blob) {
-                        // Create a File from the blob with the same name as the pdf
                         const originalName = file.name.replace(/\.pdf$/i, "");
                         const imageFile = new File([blob], `${originalName}.png`, {
                             type: "image/png",
                         });
 
                         resolve({
-                            imageUrl: URL.createObjectURL(blob),
+                            imageUrl: dataUrl,
                             file: imageFile,
                         });
                     } else {
                         resolve({
-                            imageUrl: "",
+                            imageUrl: dataUrl,
                             file: null,
                             error: "Failed to create image blob",
                         });
                     }
                 },
-                "image/png",
-                1.0
-            ); // Set quality to maximum (1.0)
+                "image/jpeg",
+                0.85
+            );
         });
     } catch (err) {
         return {

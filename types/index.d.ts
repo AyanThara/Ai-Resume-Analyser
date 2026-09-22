@@ -5,17 +5,20 @@ interface Resume {
     imagePath: string;
     resumePath: string;
     feedback: Feedback;
+    atsResult?: import("../app/lib/atsEngine").AtsResult;
 }
 
 interface Feedback {
     overallScore: number;
     ATS: {
         score: number;
+        breakdown?: import("../app/lib/atsEngine").AtsBreakdown;
         tips: {
             type: "good" | "improve";
             tip: string;
         }[];
     };
+    atsResult?: import("../app/lib/atsEngine").AtsResult;
     toneAndStyle: {
         score: number;
         tips: {

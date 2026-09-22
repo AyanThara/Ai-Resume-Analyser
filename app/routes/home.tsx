@@ -4,6 +4,7 @@ import ResumeCard from "~/components/ResumeCard";
 import {usePuterStore} from "~/lib/puter";
 import {Link, useNavigate} from "react-router";
 import {useEffect, useState} from "react";
+import {APP_CONFIG} from "~/config";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -19,24 +20,58 @@ export default function Home() {
   const [loadingResumes, setLoadingResumes] = useState(false);
 
   useEffect(() => {
-    if(!auth.isAuthenticated) navigate('/auth?next=/');
-  }, [auth.isAuthenticated])
+    // Only redirect to auth if not authenticated AND Puter KV is enabled
+    if (APP_CONFIG.PUTER_KV_ENABLED && !auth.isAuthenticated) {
+      navigate('/auth?next=/');
+    }
+  }, [auth.isAuthenticated]);
 
   useEffect(() => {
     const loadResumes = async () => {
       setLoadingResumes(true);
+      const parsedResumes: Resume[] = [];
 
-      const resumes = (await kv.list('resume:*', true)) as KVItem[];
+      // 1. Primary: Load locally persisted resumes from localStorage
+      if (APP_CONFIG.LOCAL_STORAGE_ENABLED && typeof window !== 'undefined') {
+        try {
+          for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && key.startsWith('resume:')) {
+              const val = localStorage.getItem(key);
+              if (val) {
+                parsedResumes.push(JSON.parse(val) as Resume);
+              }
+            }
+          }
+        } catch (e) {
+          console.warn("[HOME] Local storage read error:", e);
+        }
+      }
 
-      const parsedResumes = resumes?.map((resume) => (
-          JSON.parse(resume.value) as Resume
-      ))
+      // 2. Secondary: If Puter KV is enabled, merge cloud resumes
+      if (APP_CONFIG.PUTER_KV_ENABLED) {
+        try {
+          const cloudResumes = (await kv.list('resume:*', true)) as KVItem[];
+          if (cloudResumes) {
+            cloudResumes.forEach((item) => {
+              try {
+                const parsed = JSON.parse(item.value) as Resume;
+                if (!parsedResumes.some(r => r.id === parsed.id)) {
+                  parsedResumes.push(parsed);
+                }
+              } catch (parseErr) {}
+            });
+          }
+        } catch (kvErr) {
+          console.warn("[HOME] Puter kv.list notice:", kvErr);
+        }
+      }
 
-      setResumes(parsedResumes || []);
+      setResumes(parsedResumes);
       setLoadingResumes(false);
-    }
+    };
 
-    loadResumes()
+    loadResumes();
   }, []);
 
   return <main className="bg-[url('/images/bg-main.svg')] bg-cover">
@@ -53,7 +88,7 @@ export default function Home() {
       </div>
       {loadingResumes && (
           <div className="flex flex-col items-center justify-center">
-            <img src="/images/resume-scan-2.gif" className="w-[200px]" />
+            <img src="/images/resume-scan-2.gif" className="w-[200px]" alt="Scanning" />
           </div>
       )}
 
