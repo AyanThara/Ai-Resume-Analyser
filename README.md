@@ -27,7 +27,10 @@
 
 Experience the deployed application directly in your browser:
 
-### 👉 **[Open RESUMIND](https://chatgpt.com/c/VERCEL_URL)**
+### 👉 **[Open RESUMIND](https://ai-resume-analyser-ayan-tharas-projects.vercel.app)**
+
+- **Live Application**: [https://ai-resume-analyser-ayan-tharas-projects.vercel.app](https://ai-resume-analyser-ayan-tharas-projects.vercel.app)
+- **Vercel Project Dashboard**: [https://vercel.com/ayan-tharas-projects/ai-resume-analyser](https://vercel.com/ayan-tharas-projects/ai-resume-analyser)
 
 > **Privacy Notice:** RESUMIND executes entirely in your browser. All resume text extraction, natural language processing, and ATS score evaluations run client-side with zero data transmission to external servers.
 
