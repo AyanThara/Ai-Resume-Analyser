@@ -10,6 +10,10 @@ import { calculateAtsScore } from "~/lib/atsEngine";
 import { createDeterministicFeedback } from "~/lib/utils";
 import InteractiveRescorer from "~/components/InteractiveRescorer";
 import type { AtsComparisonInfo } from "~/components/AtsDashboard";
+import { ResumeImprovement } from "~/components/ResumeImprovement";
+import { extractImprovementTargets } from "~/lib/improvementTargets";
+import { generateResumeSuggestions, type ResumeSuggestion } from "~/lib/suggestionGenerator";
+import { applySuggestionToResumeText } from "~/lib/suggestionApplier";
 
 export const meta = () => ([
     { title: 'Resumind | Review ' },
@@ -17,7 +21,7 @@ export const meta = () => ([
 ])
 
 const Resume = () => {
-    const { auth, isLoading, fs, kv } = usePuterStore();
+    const { auth, isLoading, fs, kv, ai } = usePuterStore();
     const { id } = useParams();
     const [imageUrl, setImageUrl] = useState('');
     const [resumeUrl, setResumeUrl] = useState('');
@@ -35,6 +39,13 @@ const Resume = () => {
     const [atsResult, setAtsResult] = useState<AtsResult | null>(null);
     const [feedback, setFeedback] = useState<Feedback | null>(null);
     const [isRescoring, setIsRescoring] = useState(false);
+
+    // Phase 9 Resume Improvement & Suggestions state
+    const [suggestions, setSuggestions] = useState<ResumeSuggestion[]>([]);
+    const [isGeneratingSuggestions, setIsGeneratingSuggestions] = useState(false);
+    const [suggestionSource, setSuggestionSource] = useState<"ai" | "deterministic">("deterministic");
+    const [acceptedSuggestionIds, setAcceptedSuggestionIds] = useState<string[]>([]);
+    const [rejectedSuggestionIds, setRejectedSuggestionIds] = useState<string[]>([]);
 
     const isInitialLoaded = useRef(false);
     const navigate = useNavigate();
@@ -219,6 +230,48 @@ const Resume = () => {
         setCurrentJobDescription(originalJobDescription);
         setAtsResult(originalAtsResult);
         setFeedback(originalFeedback);
+        setAcceptedSuggestionIds([]);
+        setRejectedSuggestionIds([]);
+    };
+
+    // Phase 9: Generate Suggestions (on demand only)
+    const handleGenerateSuggestions = async () => {
+        const activeAts = atsResult || originalAtsResult;
+        if (!activeAts || !currentResumeText) return;
+
+        try {
+            setIsGeneratingSuggestions(true);
+            const targets = extractImprovementTargets(
+                activeAts,
+                currentResumeText,
+                currentJobDescription || originalJobDescription
+            );
+            const result = await generateResumeSuggestions({
+                targets,
+                resumeText: currentResumeText,
+                jobDescription: currentJobDescription || originalJobDescription,
+                aiChat: ai ? (prompt, opts) => ai.chat(prompt, undefined, undefined, opts) : undefined,
+            });
+            setSuggestions(result.suggestions);
+            setSuggestionSource(result.source);
+        } catch (err) {
+            console.error("[SUGGESTIONS] Error generating suggestions:", err);
+        } finally {
+            setIsGeneratingSuggestions(false);
+        }
+    };
+
+    // Phase 9: Accept Suggestion -> Updates resume text & triggers deterministic re-scoring
+    const handleAcceptSuggestion = (suggestion: ResumeSuggestion) => {
+        const updatedResume = applySuggestionToResumeText(currentResumeText, suggestion);
+        setCurrentResumeText(updatedResume);
+        setAcceptedSuggestionIds((prev) => [...prev, suggestion.id]);
+        performRescore(updatedResume, currentJobDescription);
+    };
+
+    // Phase 9: Reject Suggestion
+    const handleRejectSuggestion = (suggestionId: string) => {
+        setRejectedSuggestionIds((prev) => [...prev, suggestionId]);
     };
 
     // Save changes locally to localStorage and sessionStorage
@@ -331,6 +384,18 @@ const Resume = () => {
                                 onSaveToLocalStorage={handleSaveToLocalStorage}
                                 onRescoreNow={() => performRescore(currentResumeText, currentJobDescription)}
                                 isRescoring={isRescoring}
+                            />
+
+                            {/* Phase 9 Resume Improvement & AI Suggestions */}
+                            <ResumeImprovement
+                                suggestions={suggestions}
+                                isLoading={isGeneratingSuggestions}
+                                source={suggestionSource}
+                                onGenerate={handleGenerateSuggestions}
+                                onAcceptSuggestion={handleAcceptSuggestion}
+                                onRejectSuggestion={handleRejectSuggestion}
+                                acceptedIds={acceptedSuggestionIds}
+                                rejectedIds={rejectedSuggestionIds}
                             />
 
                             <Summary feedback={feedback} />
