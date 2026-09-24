@@ -1,5 +1,5 @@
 import {Link, useNavigate, useParams} from "react-router";
-import {useEffect, useState} from "react";
+import {useEffect, useState, useRef, useMemo} from "react";
 import {usePuterStore} from "~/lib/puter";
 import Summary from "~/components/Summary";
 import ATS from "~/components/ATS";
@@ -7,6 +7,9 @@ import Details from "~/components/Details";
 import {APP_CONFIG} from "~/config";
 import type { AtsResult } from "~/lib/atsEngine";
 import { calculateAtsScore } from "~/lib/atsEngine";
+import { createDeterministicFeedback } from "~/lib/utils";
+import InteractiveRescorer from "~/components/InteractiveRescorer";
+import type { AtsComparisonInfo } from "~/components/AtsDashboard";
 
 export const meta = () => ([
     { title: 'Resumind | Review ' },
@@ -18,8 +21,22 @@ const Resume = () => {
     const { id } = useParams();
     const [imageUrl, setImageUrl] = useState('');
     const [resumeUrl, setResumeUrl] = useState('');
-    const [feedback, setFeedback] = useState<Feedback | null>(null);
+
+    // Original Baseline state
+    const [originalResumeText, setOriginalResumeText] = useState('');
+    const [originalJobDescription, setOriginalJobDescription] = useState('');
+    const [originalJobTitle, setOriginalJobTitle] = useState('');
+    const [originalAtsResult, setOriginalAtsResult] = useState<AtsResult | null>(null);
+    const [originalFeedback, setOriginalFeedback] = useState<Feedback | null>(null);
+
+    // Current Modified / Re-scored state
+    const [currentResumeText, setCurrentResumeText] = useState('');
+    const [currentJobDescription, setCurrentJobDescription] = useState('');
     const [atsResult, setAtsResult] = useState<AtsResult | null>(null);
+    const [feedback, setFeedback] = useState<Feedback | null>(null);
+    const [isRescoring, setIsRescoring] = useState(false);
+
+    const isInitialLoaded = useRef(false);
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -103,20 +120,48 @@ const Resume = () => {
                 }
             }
 
-            setFeedback(data.feedback);
+            const rawResumeText = data.resumeText || '';
+            const rawJd = data.jobDescription || '';
+            const rawJobTitle = data.jobTitle || '';
 
-            if (data.atsResult) {
-                setAtsResult(data.atsResult);
-            } else if (data.feedback?.atsResult) {
-                setAtsResult(data.feedback.atsResult);
-            } else if (data.resumeText && data.jobDescription) {
+            setOriginalResumeText(rawResumeText);
+            setCurrentResumeText(rawResumeText);
+
+            setOriginalJobDescription(rawJd);
+            setCurrentJobDescription(rawJd);
+
+            setOriginalJobTitle(rawJobTitle);
+
+            let effectiveAtsResult: AtsResult | null = data.atsResult || data.feedback?.atsResult || null;
+
+            // If atsResult is missing or incomplete, compute it from resumeText and jobDescription if available
+            if ((!effectiveAtsResult || !effectiveAtsResult.diagnostics) && rawResumeText && rawJd) {
                 try {
-                    const computed = calculateAtsScore(data.resumeText, data.jobDescription, data.jobTitle);
-                    setAtsResult(computed);
+                    effectiveAtsResult = calculateAtsScore(rawResumeText, rawJd, rawJobTitle);
                 } catch (calcErr) {
                     console.warn("[RESUME] Error computing ATS diagnostics:", calcErr);
                 }
             }
+
+            if (effectiveAtsResult) {
+                setOriginalAtsResult(effectiveAtsResult);
+                setAtsResult(effectiveAtsResult);
+
+                // If feedback is missing, or is legacy (missing atsResult or inconsistent scores), create/sync deterministic feedback
+                if (!data.feedback || data.feedback.overallScore !== effectiveAtsResult.overallScore || !data.feedback.ATS?.breakdown) {
+                    const syncedFeedback = createDeterministicFeedback(effectiveAtsResult, rawJobTitle, rawJd);
+                    setOriginalFeedback(syncedFeedback);
+                    setFeedback(syncedFeedback);
+                } else {
+                    setOriginalFeedback(data.feedback);
+                    setFeedback(data.feedback);
+                }
+            } else {
+                setOriginalFeedback(data.feedback);
+                setFeedback(data.feedback);
+            }
+
+            isInitialLoaded.current = true;
         };
 
         loadResume();
@@ -127,6 +172,107 @@ const Resume = () => {
             }
         };
     }, [id]);
+
+    // Live Re-scoring execution
+    const performRescore = (rText: string, jdText: string) => {
+        if (!rText.trim()) return;
+        try {
+            setIsRescoring(true);
+            const newAtsResult = calculateAtsScore(rText, jdText, originalJobTitle);
+            const newFeedback = createDeterministicFeedback(newAtsResult, originalJobTitle, jdText);
+            setAtsResult(newAtsResult);
+            setFeedback(newFeedback);
+        } catch (err) {
+            console.error("[RESCORE] Deterministic re-scoring error:", err);
+        } finally {
+            setIsRescoring(false);
+        }
+    };
+
+    // Debounced live re-scoring on user edits
+    useEffect(() => {
+        if (!isInitialLoaded.current) return;
+
+        // Check if actually modified from original
+        const isModified =
+            currentResumeText.trim() !== originalResumeText.trim() ||
+            currentJobDescription.trim() !== originalJobDescription.trim();
+
+        if (!isModified) {
+            if (originalAtsResult && originalFeedback) {
+                setAtsResult(originalAtsResult);
+                setFeedback(originalFeedback);
+            }
+            return;
+        }
+
+        const timer = setTimeout(() => {
+            performRescore(currentResumeText, currentJobDescription);
+        }, 300);
+
+        return () => clearTimeout(timer);
+    }, [currentResumeText, currentJobDescription]);
+
+    // Reset to Original Baseline
+    const handleResetToOriginal = () => {
+        setCurrentResumeText(originalResumeText);
+        setCurrentJobDescription(originalJobDescription);
+        setAtsResult(originalAtsResult);
+        setFeedback(originalFeedback);
+    };
+
+    // Save changes locally to localStorage and sessionStorage
+    const handleSaveToLocalStorage = () => {
+        if (typeof window === 'undefined' || !id) return;
+        try {
+            const existingRaw = sessionStorage.getItem(`resume:${id}`) || localStorage.getItem(`resume:${id}`);
+            const parsed = existingRaw ? JSON.parse(existingRaw) : {};
+            const updated = {
+                ...parsed,
+                resumeText: currentResumeText,
+                jobDescription: currentJobDescription,
+                atsResult,
+                feedback,
+            };
+            const serialized = JSON.stringify(updated);
+            localStorage.setItem(`resume:${id}`, serialized);
+            sessionStorage.setItem(`resume:${id}`, serialized);
+
+            // Establish new baseline
+            setOriginalResumeText(currentResumeText);
+            setOriginalJobDescription(currentJobDescription);
+            setOriginalAtsResult(atsResult);
+            setOriginalFeedback(feedback);
+        } catch (err) {
+            console.warn("[RESUME] Local save error:", err);
+        }
+    };
+
+    // Comparison data computation for ATS Dashboard
+    const isModified = Boolean(
+        (originalResumeText.trim() !== currentResumeText.trim() ||
+            currentJobDescription.trim() !== originalJobDescription.trim()) &&
+        originalAtsResult &&
+        atsResult
+    );
+
+    const comparisonInfo: AtsComparisonInfo | null = useMemo(() => {
+        if (!originalAtsResult || !atsResult) return null;
+        const origBd = originalAtsResult.breakdown;
+        const currBd = atsResult.breakdown;
+        return {
+            originalScore: originalAtsResult.overallScore,
+            currentScore: atsResult.overallScore,
+            deltaScore: atsResult.overallScore - originalAtsResult.overallScore,
+            originalBreakdown: origBd,
+            currentBreakdown: currBd,
+            deltaKeyword: currBd.keywordMatch - origBd.keywordMatch,
+            deltaStructure: currBd.structure - origBd.structure,
+            deltaParseability: currBd.parseability - origBd.parseability,
+            deltaContent: currBd.content - origBd.content,
+            isModified,
+        };
+    }, [originalAtsResult, atsResult, isModified]);
 
     return (
         <main className="!pt-0">
@@ -161,15 +307,42 @@ const Resume = () => {
                     )}
                 </section>
                 <section className="feedback-section">
-                    <h2 className="text-4xl !text-black font-bold">Resume Review</h2>
+                    <div className="flex flex-col gap-2">
+                        <h2 className="text-4xl !text-black font-bold">Resume Review</h2>
+                        <p className="text-sm text-gray-500">
+                            Comprehensive deterministic ATS score and explainability report.
+                        </p>
+                    </div>
+
                     {feedback ? (
                         <div className="flex flex-col gap-8 animate-in fade-in duration-1000">
+                            {/* Phase 8.2 Interactive Re-scoring Studio */}
+                            <InteractiveRescorer
+                                originalResumeText={originalResumeText}
+                                originalJobDescription={originalJobDescription}
+                                originalJobTitle={originalJobTitle}
+                                originalAtsResult={originalAtsResult}
+                                currentResumeText={currentResumeText}
+                                currentJobDescription={currentJobDescription}
+                                currentAtsResult={atsResult}
+                                onResumeTextChange={setCurrentResumeText}
+                                onJobDescriptionChange={setCurrentJobDescription}
+                                onResetToOriginal={handleResetToOriginal}
+                                onSaveToLocalStorage={handleSaveToLocalStorage}
+                                onRescoreNow={() => performRescore(currentResumeText, currentJobDescription)}
+                                isRescoring={isRescoring}
+                            />
+
                             <Summary feedback={feedback} />
+
                             <ATS
                                 score={feedback.ATS.score || 0}
                                 suggestions={feedback.ATS.tips || []}
                                 atsResult={atsResult || feedback.atsResult}
+                                comparison={comparisonInfo}
+                                onResetToOriginal={handleResetToOriginal}
                             />
+
                             <Details feedback={feedback} />
                         </div>
                     ) : (

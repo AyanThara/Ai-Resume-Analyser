@@ -58,26 +58,43 @@ export async function extractTextFromPdf(file: File): Promise<string> {
                 const page = await pdf.getPage(pageNum);
                 const textContent = await page.getTextContent();
 
-                let rawPageText = "";
+                const pageLines: string[] = [];
+                let currentLine = "";
+                let lastY: number | null = null;
+
                 for (const item of textContent.items) {
                     if ("str" in item && typeof item.str === "string") {
-                        rawPageText += item.str;
-                        if (item.hasEOL) {
-                            rawPageText += "\n";
-                        } else if (item.str.length > 0 && !item.str.endsWith(" ")) {
-                            rawPageText += " ";
+                        const y = Array.isArray(item.transform) ? item.transform[5] : null;
+
+                        // Detect newline if Y-coordinate shifted significantly (>3 points) or item.hasEOL is true
+                        const isNewLine = (lastY !== null && y !== null && Math.abs(y - lastY) > 3) || Boolean((item as any).hasEOL);
+
+                        if (isNewLine) {
+                            const trimmed = currentLine.trim();
+                            if (trimmed) {
+                                pageLines.push(trimmed);
+                            }
+                            currentLine = item.str;
+                        } else {
+                            if (currentLine && !currentLine.endsWith(" ") && item.str.length > 0 && !item.str.startsWith(" ")) {
+                                currentLine += " ";
+                            }
+                            currentLine += item.str;
+                        }
+
+                        if (y !== null) {
+                            lastY = y;
                         }
                     }
                 }
 
-                // Clean up excessive whitespace while preserving line structure
-                const cleanedPageLines = rawPageText
-                    .split("\n")
-                    .map((line) => line.replace(/[ \t]+/g, " ").trim())
-                    .filter((line) => line.length > 0);
+                const lastTrimmed = currentLine.trim();
+                if (lastTrimmed) {
+                    pageLines.push(lastTrimmed);
+                }
 
-                if (cleanedPageLines.length > 0) {
-                    pageTexts.push(cleanedPageLines.join("\n"));
+                if (pageLines.length > 0) {
+                    pageTexts.push(pageLines.join("\n"));
                 }
             } catch (pageErr) {
                 console.warn(`[pdfTextExtractor] Warning: Failed to extract text from page ${pageNum}:`, pageErr);

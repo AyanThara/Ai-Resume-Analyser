@@ -7,16 +7,33 @@ import type {
 } from "~/lib/alignmentDiagnostics";
 import type { ExtractedSkill } from "~/lib/jdParser";
 
+export interface AtsComparisonInfo {
+  originalScore: number;
+  currentScore: number;
+  deltaScore: number;
+  originalBreakdown: AtsBreakdown;
+  currentBreakdown: AtsBreakdown;
+  deltaKeyword: number;
+  deltaStructure: number;
+  deltaParseability: number;
+  deltaContent: number;
+  isModified: boolean;
+}
+
 interface AtsDashboardProps {
   score: number;
   suggestions?: { type: "good" | "improve"; tip: string }[];
   atsResult?: AtsResult | null;
+  comparison?: AtsComparisonInfo | null;
+  onResetToOriginal?: () => void;
 }
 
 export const AtsDashboard: React.FC<AtsDashboardProps> = ({
   score,
   suggestions = [],
   atsResult,
+  comparison,
+  onResetToOriginal,
 }) => {
   const [activeRequiredFilter, setActiveRequiredFilter] = useState<
     "all" | RequiredAlignmentVerdict
@@ -87,6 +104,116 @@ export const AtsDashboard: React.FC<AtsDashboardProps> = ({
         id="ats-score-overview"
         className={`bg-gradient-to-b ${gradientClass} rounded-2xl shadow-sm border p-6 transition-all duration-300`}
       >
+        {/* Interactive Re-scoring Comparison Banner */}
+        {comparison && comparison.isModified && (
+          <div className="mb-6 p-4 rounded-xl bg-white/90 border border-indigo-200 shadow-xs backdrop-blur-xs">
+            <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-indigo-100">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-indigo-600 animate-pulse" />
+                <span className="text-xs font-bold text-indigo-950 uppercase tracking-wider">
+                  Interactive Re-scoring Active (vs. Original Baseline)
+                </span>
+              </div>
+              {onResetToOriginal && (
+                <button
+                  onClick={onResetToOriginal}
+                  type="button"
+                  className="text-[11px] font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1"
+                >
+                  <span>↺</span> Reset to Original Baseline
+                </button>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 pt-3">
+              <div className="p-2 rounded-lg bg-indigo-50/60 border border-indigo-100 text-center">
+                <span className="text-[10px] uppercase font-bold text-indigo-900 block">Overall Score</span>
+                <div className="flex items-center justify-center gap-1.5 mt-0.5">
+                  <span className="text-xs text-gray-400 line-through">{comparison.originalScore}</span>
+                  <span className="text-sm font-extrabold text-gray-900">{comparison.currentScore}</span>
+                  <span className={`text-[10px] font-bold px-1 rounded ${
+                    comparison.deltaScore > 0
+                      ? "bg-emerald-100 text-emerald-800"
+                      : comparison.deltaScore < 0
+                      ? "bg-rose-100 text-rose-800"
+                      : "bg-gray-100 text-gray-700"
+                  }`}>
+                    {comparison.deltaScore > 0 ? `+${comparison.deltaScore}` : comparison.deltaScore}
+                  </span>
+                </div>
+              </div>
+
+              <div className="p-2 rounded-lg bg-gray-50 border border-gray-100 text-center">
+                <span className="text-[10px] uppercase font-bold text-gray-600 block">Keyword</span>
+                <div className="flex items-center justify-center gap-1.5 mt-0.5">
+                  <span className="text-xs text-gray-400 line-through">{comparison.originalBreakdown.keywordMatch}</span>
+                  <span className="text-sm font-extrabold text-gray-900">{comparison.currentBreakdown.keywordMatch}</span>
+                  <span className={`text-[10px] font-bold px-1 rounded ${
+                    comparison.deltaKeyword > 0
+                      ? "bg-emerald-100 text-emerald-800"
+                      : comparison.deltaKeyword < 0
+                      ? "bg-rose-100 text-rose-800"
+                      : "bg-gray-100 text-gray-700"
+                  }`}>
+                    {comparison.deltaKeyword > 0 ? `+${comparison.deltaKeyword}` : comparison.deltaKeyword}
+                  </span>
+                </div>
+              </div>
+
+              <div className="p-2 rounded-lg bg-gray-50 border border-gray-100 text-center">
+                <span className="text-[10px] uppercase font-bold text-gray-600 block">Content</span>
+                <div className="flex items-center justify-center gap-1.5 mt-0.5">
+                  <span className="text-xs text-gray-400 line-through">{comparison.originalBreakdown.content}</span>
+                  <span className="text-sm font-extrabold text-gray-900">{comparison.currentBreakdown.content}</span>
+                  <span className={`text-[10px] font-bold px-1 rounded ${
+                    comparison.deltaContent > 0
+                      ? "bg-emerald-100 text-emerald-800"
+                      : comparison.deltaContent < 0
+                      ? "bg-rose-100 text-rose-800"
+                      : "bg-gray-100 text-gray-700"
+                  }`}>
+                    {comparison.deltaContent > 0 ? `+${comparison.deltaContent}` : comparison.deltaContent}
+                  </span>
+                </div>
+              </div>
+
+              <div className="p-2 rounded-lg bg-gray-50 border border-gray-100 text-center">
+                <span className="text-[10px] uppercase font-bold text-gray-600 block">Structure</span>
+                <div className="flex items-center justify-center gap-1.5 mt-0.5">
+                  <span className="text-xs text-gray-400 line-through">{comparison.originalBreakdown.structure}</span>
+                  <span className="text-sm font-extrabold text-gray-900">{comparison.currentBreakdown.structure}</span>
+                  <span className={`text-[10px] font-bold px-1 rounded ${
+                    comparison.deltaStructure > 0
+                      ? "bg-emerald-100 text-emerald-800"
+                      : comparison.deltaStructure < 0
+                      ? "bg-rose-100 text-rose-800"
+                      : "bg-gray-100 text-gray-700"
+                  }`}>
+                    {comparison.deltaStructure > 0 ? `+${comparison.deltaStructure}` : comparison.deltaStructure}
+                  </span>
+                </div>
+              </div>
+
+              <div className="p-2 rounded-lg bg-gray-50 border border-gray-100 text-center">
+                <span className="text-[10px] uppercase font-bold text-gray-600 block">Parseability</span>
+                <div className="flex items-center justify-center gap-1.5 mt-0.5">
+                  <span className="text-xs text-gray-400 line-through">{comparison.originalBreakdown.parseability}</span>
+                  <span className="text-sm font-extrabold text-gray-900">{comparison.currentBreakdown.parseability}</span>
+                  <span className={`text-[10px] font-bold px-1 rounded ${
+                    comparison.deltaParseability > 0
+                      ? "bg-emerald-100 text-emerald-800"
+                      : comparison.deltaParseability < 0
+                      ? "bg-rose-100 text-rose-800"
+                      : "bg-gray-100 text-gray-700"
+                  }`}>
+                    {comparison.deltaParseability > 0 ? `+${comparison.deltaParseability}` : comparison.deltaParseability}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 pb-6 border-b border-gray-200/60">
           <div className="flex items-center gap-4">
             <img
@@ -110,6 +237,17 @@ export const AtsDashboard: React.FC<AtsDashboardProps> = ({
                 >
                   {scoreSubtitle}
                 </span>
+                {comparison && comparison.isModified && (
+                  <span className={`text-xs font-extrabold px-2 py-0.5 rounded-full ${
+                    comparison.deltaScore > 0
+                      ? "bg-emerald-600 text-white"
+                      : comparison.deltaScore < 0
+                      ? "bg-rose-600 text-white"
+                      : "bg-gray-600 text-white"
+                  }`}>
+                    {comparison.deltaScore > 0 ? `+${comparison.deltaScore}` : comparison.deltaScore} vs. original
+                  </span>
+                )}
               </div>
               <p className="text-sm text-gray-600 mt-1">
                 Deterministic algorithmic evaluation calibrated across ATS parsing, keyword relevance, document structure, and quantified impact.
@@ -130,9 +268,18 @@ export const AtsDashboard: React.FC<AtsDashboardProps> = ({
                 <span className="text-sm font-semibold text-gray-800">
                   Keyword Match
                 </span>
-                <span className="text-xs font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
-                  {breakdown.keywordMatch}/40
-                </span>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
+                    {breakdown.keywordMatch}/40
+                  </span>
+                  {comparison && comparison.isModified && comparison.deltaKeyword !== 0 && (
+                    <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${
+                      comparison.deltaKeyword > 0 ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"
+                    }`}>
+                      {comparison.deltaKeyword > 0 ? `+${comparison.deltaKeyword}` : comparison.deltaKeyword}
+                    </span>
+                  )}
+                </div>
               </div>
               <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
                 <div
@@ -153,9 +300,18 @@ export const AtsDashboard: React.FC<AtsDashboardProps> = ({
                 <span className="text-sm font-semibold text-gray-800">
                   Content Quality
                 </span>
-                <span className="text-xs font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200">
-                  {breakdown.content}/25
-                </span>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200">
+                    {breakdown.content}/25
+                  </span>
+                  {comparison && comparison.isModified && comparison.deltaContent !== 0 && (
+                    <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${
+                      comparison.deltaContent > 0 ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"
+                    }`}>
+                      {comparison.deltaContent > 0 ? `+${comparison.deltaContent}` : comparison.deltaContent}
+                    </span>
+                  )}
+                </div>
               </div>
               <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
                 <div
@@ -176,9 +332,18 @@ export const AtsDashboard: React.FC<AtsDashboardProps> = ({
                 <span className="text-sm font-semibold text-gray-800">
                   Structure
                 </span>
-                <span className="text-xs font-bold text-teal-700 bg-teal-50 px-2 py-0.5 rounded-full border border-teal-200">
-                  {breakdown.structure}/20
-                </span>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs font-bold text-teal-700 bg-teal-50 px-2 py-0.5 rounded-full border border-teal-200">
+                    {breakdown.structure}/20
+                  </span>
+                  {comparison && comparison.isModified && comparison.deltaStructure !== 0 && (
+                    <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${
+                      comparison.deltaStructure > 0 ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"
+                    }`}>
+                      {comparison.deltaStructure > 0 ? `+${comparison.deltaStructure}` : comparison.deltaStructure}
+                    </span>
+                  )}
+                </div>
               </div>
               <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
                 <div
@@ -199,9 +364,18 @@ export const AtsDashboard: React.FC<AtsDashboardProps> = ({
                 <span className="text-sm font-semibold text-gray-800">
                   Parseability
                 </span>
-                <span className="text-xs font-bold text-violet-700 bg-violet-50 px-2 py-0.5 rounded-full border border-violet-200">
-                  {breakdown.parseability}/15
-                </span>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs font-bold text-violet-700 bg-violet-50 px-2 py-0.5 rounded-full border border-violet-200">
+                    {breakdown.parseability}/15
+                  </span>
+                  {comparison && comparison.isModified && comparison.deltaParseability !== 0 && (
+                    <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${
+                      comparison.deltaParseability > 0 ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"
+                    }`}>
+                      {comparison.deltaParseability > 0 ? `+${comparison.deltaParseability}` : comparison.deltaParseability}
+                    </span>
+                  )}
+                </div>
               </div>
               <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
                 <div
@@ -555,6 +729,26 @@ export const AtsDashboard: React.FC<AtsDashboardProps> = ({
                         {skill.evidenceStrength === "none" && "No Evidence"}
                       </span>
                     </div>
+
+                    {/* Practical Evidence Status Indicator */}
+                    <div className="flex items-center gap-1.5 pt-1.5 border-t border-gray-200/40 text-[11px] flex-wrap">
+                      <span className="font-medium text-gray-500">Practical Status:</span>
+                      {skill.hasPracticalEvidence ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                          <img src="/icons/check.svg" alt="Verified" className="w-2.5 h-2.5" />
+                          Substantiated in {skill.sections.filter(s => s === "Projects" || s === "Experience").join(" & ") || "Projects/Experience"}
+                        </span>
+                      ) : skill.matched ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800 border border-amber-200">
+                          <img src="/icons/warning.svg" alt="Lacking" className="w-2.5 h-2.5" />
+                          Listed without project/experience proof
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-rose-100 text-rose-800 border border-rose-200">
+                          Missing from resume
+                        </span>
+                      )}
+                    </div>
                   </div>
                 );
               })}
@@ -636,7 +830,7 @@ export const AtsDashboard: React.FC<AtsDashboardProps> = ({
       </section>
 
       {/* =====================================================================
-          SECTION 5 & 8: EVIDENCE QUALITY & SKILL PLACEMENT
+          SECTION 5 & 6: EVIDENCE QUALITY & SKILL PLACEMENT
           ===================================================================== */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Section 5: Evidence Quality */}
@@ -648,19 +842,19 @@ export const AtsDashboard: React.FC<AtsDashboardProps> = ({
             <div className="pb-4 border-b border-gray-100">
               <h3 className="text-lg font-bold text-gray-900">Evidence Quality Diagnostics</h3>
               <p className="text-xs text-gray-500 mt-0.5">
-                Depth of practical proof backing technical claims.
+                Depth of practical proof backing technical claims using Phase 7.3 evidence analysis.
               </p>
             </div>
 
-            {placement ? (
+            {placement || atsResult?.matchResult?.evidenceSummary ? (
               <div className="mt-4 space-y-4">
                 <div className="grid grid-cols-3 gap-2.5">
                   <div className="bg-emerald-50 rounded-xl p-3 border border-emerald-100 text-center">
                     <span className="text-xl font-extrabold text-emerald-700 block">
-                      {placement.optimalCount}
+                      {atsResult?.matchResult?.evidenceSummary?.strong ?? placement?.optimalCount ?? 0}
                     </span>
                     <span className="text-[11px] font-semibold text-emerald-900 uppercase tracking-wider block mt-0.5">
-                      Strong Proof
+                      Strong Evidence
                     </span>
                     <span className="text-[10px] text-emerald-600 block mt-0.5">
                       In Experience/Projects
@@ -669,19 +863,19 @@ export const AtsDashboard: React.FC<AtsDashboardProps> = ({
 
                   <div className="bg-blue-50 rounded-xl p-3 border border-blue-100 text-center">
                     <span className="text-xl font-extrabold text-blue-700 block">
-                      {placement.peripheralCount}
+                      {atsResult?.matchResult?.evidenceSummary?.moderate ?? placement?.peripheralCount ?? 0}
                     </span>
                     <span className="text-[11px] font-semibold text-blue-900 uppercase tracking-wider block mt-0.5">
-                      Moderate Proof
+                      Moderate Evidence
                     </span>
                     <span className="text-[10px] text-blue-600 block mt-0.5">
-                      Summary/Education
+                      Secondary sections
                     </span>
                   </div>
 
                   <div className="bg-amber-50 rounded-xl p-3 border border-amber-100 text-center">
                     <span className="text-xl font-extrabold text-amber-700 block">
-                      {placement.skillsOnlyCount}
+                      {atsResult?.matchResult?.evidenceSummary?.mentionOnly ?? placement?.skillsOnlyCount ?? 0}
                     </span>
                     <span className="text-[11px] font-semibold text-amber-900 uppercase tracking-wider block mt-0.5">
                       Mention Only
@@ -692,15 +886,15 @@ export const AtsDashboard: React.FC<AtsDashboardProps> = ({
                   </div>
                 </div>
 
-                {/* Skills Lacking Practical Evidence Warning Callout */}
-                {placement.skillsOnlySkills.length > 0 ? (
+                {/* Evidence Gaps & Skills Lacking Practical Evidence */}
+                {placement && placement.skillsOnlySkills.length > 0 ? (
                   <div className="p-3.5 rounded-xl bg-amber-50/70 border border-amber-200">
                     <div className="flex items-center gap-1.5 text-xs font-bold text-amber-900 mb-1.5">
                       <img src="/icons/warning.svg" alt="Warning" className="w-4 h-4" />
-                      Skills Listed Without Practical Bullets ({placement.skillsOnlySkills.length})
+                      Evidence Gaps: Listed Without Practical Evidence ({placement.skillsOnlySkills.length})
                     </div>
                     <p className="text-xs text-amber-800 mb-2">
-                      ATS parsers and senior hiring managers discount skills that are only listed in a skills block without corresponding project or work experience bullets:
+                      ATS parsers and senior hiring managers discount skills that appear only in a skills list without implementation context in project or work bullets:
                     </p>
                     <div className="flex flex-wrap gap-1.5">
                       {placement.skillsOnlySkills.map((sk) => (
@@ -716,7 +910,7 @@ export const AtsDashboard: React.FC<AtsDashboardProps> = ({
                 ) : (
                   <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-100 text-xs text-emerald-900 flex items-center gap-2">
                     <img src="/icons/check.svg" alt="Verified" className="w-4 h-4" />
-                    <span>All matched technical skills are supported by contextual work or project bullets.</span>
+                    <span>No critical evidence gaps — technical skills are substantiated by contextual work or project bullets.</span>
                   </div>
                 )}
               </div>
@@ -728,7 +922,7 @@ export const AtsDashboard: React.FC<AtsDashboardProps> = ({
           </div>
         </section>
 
-        {/* Section 8: Skill Placement */}
+        {/* Section 6: Skill Placement Intelligence */}
         <section
           id="skill-placement-section"
           className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 flex flex-col justify-between"
@@ -742,69 +936,99 @@ export const AtsDashboard: React.FC<AtsDashboardProps> = ({
             </div>
 
             <div className="mt-4 space-y-3.5">
-              {/* Legend with clear definitions */}
-              <div className="space-y-2 text-xs">
-                <div className="flex items-start gap-2.5 p-2 rounded-lg bg-gray-50 border border-gray-100">
-                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0 mt-1" />
-                  <div>
-                    <span className="font-bold text-gray-900">Optimal Placement:</span>
-                    <p className="text-gray-600 mt-0.5">
-                      Validated within Experience or Projects with action verbs and quantifiable metrics.
-                    </p>
+              {/* Optimal Placement */}
+              <div className="p-3 rounded-xl bg-emerald-50/50 border border-emerald-100 text-xs space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 font-bold text-emerald-900">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
+                    Optimal Placement:
                   </div>
+                  <span className="font-extrabold text-emerald-800 text-[11px]">
+                    {placement?.items.filter((i) => i.quality === "optimal").length ?? 0} skills
+                  </span>
                 </div>
-
-                <div className="flex items-start gap-2.5 p-2 rounded-lg bg-gray-50 border border-gray-100">
-                  <span className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0 mt-1" />
-                  <div>
-                    <span className="font-bold text-gray-900">Skills-Only:</span>
-                    <p className="text-gray-600 mt-0.5">
-                      Confined strictly to a bulletless technical skills section. Weakest algorithmic impact.
-                    </p>
+                <p className="text-emerald-950/80 leading-relaxed text-[11px]">
+                  Skill demonstrated inside Projects/Experience with implementation context.
+                </p>
+                {placement && (
+                  <div className="flex flex-wrap gap-1 pt-1">
+                    {placement.items
+                      .filter((i) => i.quality === "optimal")
+                      .map((i) => (
+                        <span
+                          key={i.skillId}
+                          className="bg-white text-emerald-900 border border-emerald-200 px-2 py-0.5 rounded text-[10px] font-semibold"
+                        >
+                          {i.skillDisplay}
+                        </span>
+                      ))}
                   </div>
-                </div>
-
-                <div className="flex items-start gap-2.5 p-2 rounded-lg bg-gray-50 border border-gray-100">
-                  <span className="w-2.5 h-2.5 rounded-full bg-blue-500 shrink-0 mt-1" />
-                  <div>
-                    <span className="font-bold text-gray-900">Peripheral:</span>
-                    <p className="text-gray-600 mt-0.5">
-                      Mentioned in Summary or Education headers without measurable delivery metrics.
-                    </p>
-                  </div>
-                </div>
+                )}
               </div>
 
-              {/* Placement items list sample */}
-              {placement && placement.items.length > 0 && (
-                <div className="pt-2">
-                  <span className="text-xs font-semibold text-gray-500 block mb-2">
-                    Evaluated Skill Placements ({placement.items.length})
-                  </span>
-                  <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto pr-1">
-                    {placement.items.map((item) => {
-                      const badgeBg =
-                        item.quality === "optimal"
-                          ? "bg-emerald-50 text-emerald-800 border-emerald-200"
-                          : item.quality === "mention_only"
-                          ? "bg-amber-50 text-amber-800 border-amber-200"
-                          : "bg-blue-50 text-blue-800 border-blue-200";
-
-                      return (
-                        <span
-                          key={item.skillId}
-                          className={`text-[11px] font-medium px-2 py-0.5 rounded-md border flex items-center gap-1 ${badgeBg}`}
-                        >
-                          {item.skillDisplay}
-                          <span className="text-[9px] uppercase font-bold text-gray-500">
-                            ({item.quality.replace("_", " ")})
-                          </span>
-                        </span>
-                      );
-                    })}
+              {/* Skills-only Placement */}
+              <div className="p-3 rounded-xl bg-amber-50/50 border border-amber-100 text-xs space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 font-bold text-amber-900">
+                    <span className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0" />
+                    Skills-Only:
                   </div>
+                  <span className="font-extrabold text-amber-800 text-[11px]">
+                    {placement?.items.filter((i) => i.quality === "mention_only").length ?? 0} skills
+                  </span>
                 </div>
-              )}
+                <p className="text-amber-950/80 leading-relaxed text-[11px]">
+                  Skill appears only in a passive Skills section.
+                </p>
+                {placement && placement.items.some((i) => i.quality === "mention_only") ? (
+                  <div className="flex flex-wrap gap-1 pt-1">
+                    {placement.items
+                      .filter((i) => i.quality === "mention_only")
+                      .map((i) => (
+                        <span
+                          key={i.skillId}
+                          className="bg-white text-amber-900 border border-amber-200 px-2 py-0.5 rounded text-[10px] font-semibold"
+                        >
+                          {i.skillDisplay}
+                        </span>
+                      ))}
+                  </div>
+                ) : (
+                  <span className="text-[10px] text-gray-400 italic block">None</span>
+                )}
+              </div>
+
+              {/* Peripheral Placement */}
+              <div className="p-3 rounded-xl bg-blue-50/50 border border-blue-100 text-xs space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 font-bold text-blue-900">
+                    <span className="w-2.5 h-2.5 rounded-full bg-blue-500 shrink-0" />
+                    Peripheral:
+                  </div>
+                  <span className="font-extrabold text-blue-800 text-[11px]">
+                    {placement?.items.filter((i) => i.quality === "peripheral_only").length ?? 0} skills
+                  </span>
+                </div>
+                <p className="text-blue-950/80 leading-relaxed text-[11px]">
+                  Skill appears only in areas such as Education, Certifications or Summary without implementation evidence.
+                </p>
+                {placement && placement.items.some((i) => i.quality === "peripheral_only") ? (
+                  <div className="flex flex-wrap gap-1 pt-1">
+                    {placement.items
+                      .filter((i) => i.quality === "peripheral_only")
+                      .map((i) => (
+                        <span
+                          key={i.skillId}
+                          className="bg-white text-blue-900 border border-blue-200 px-2 py-0.5 rounded text-[10px] font-semibold"
+                        >
+                          {i.skillDisplay}
+                        </span>
+                      ))}
+                  </div>
+                ) : (
+                  <span className="text-[10px] text-gray-400 italic block">None</span>
+                )}
+              </div>
             </div>
           </div>
         </section>

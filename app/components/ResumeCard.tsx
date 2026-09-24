@@ -2,21 +2,41 @@ import {Link} from "react-router";
 import ScoreCircle from "~/components/ScoreCircle";
 import {useEffect, useState} from "react";
 import {usePuterStore} from "~/lib/puter";
+import {APP_CONFIG} from "~/config";
 
-const ResumeCard = ({ resume: { id, companyName, jobTitle, feedback, imagePath } }: { resume: Resume }) => {
+const ResumeCard = ({ resume: { id, companyName, jobTitle, feedback, imagePath, imageUrl } }: { resume: Resume }) => {
     const { fs } = usePuterStore();
     const [resumeUrl, setResumeUrl] = useState('');
 
     useEffect(() => {
-        const loadResume = async () => {
-            const blob = await fs.read(imagePath);
-            if(!blob) return;
-            let url = URL.createObjectURL(blob);
-            setResumeUrl(url);
+        let createdBlobUrl = '';
+
+        if (imageUrl) {
+            setResumeUrl(imageUrl);
+            return;
         }
 
-        loadResume();
-    }, [imagePath]);
+        if (imagePath && APP_CONFIG.PUTER_FS_ENABLED) {
+            const loadResume = async () => {
+                try {
+                    const blob = await fs.read(imagePath);
+                    if (!blob) return;
+                    createdBlobUrl = URL.createObjectURL(blob);
+                    setResumeUrl(createdBlobUrl);
+                } catch (err) {
+                    console.warn("[ResumeCard] Failed to load image from Puter FS:", err);
+                }
+            };
+
+            loadResume();
+        }
+
+        return () => {
+            if (createdBlobUrl) {
+                URL.revokeObjectURL(createdBlobUrl);
+            }
+        };
+    }, [imageUrl, imagePath]);
 
     return (
         <Link to={`/resume/${id}`} className="resume-card animate-in fade-in duration-1000">

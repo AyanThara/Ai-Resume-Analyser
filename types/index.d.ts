@@ -2,8 +2,12 @@ interface Resume {
     id: string;
     companyName?: string;
     jobTitle?: string;
-    imagePath: string;
-    resumePath: string;
+    imagePath?: string;
+    imageUrl?: string;
+    resumePath?: string;
+    resumeUrl?: string;
+    resumeText?: string;
+    jobDescription?: string;
     feedback: Feedback;
     atsResult?: import("../app/lib/atsEngine").AtsResult;
 }

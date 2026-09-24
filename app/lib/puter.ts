@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { APP_CONFIG } from "~/config";
 
 declare global {
     interface Window {
@@ -266,6 +267,7 @@ export const usePuterStore = create<PuterStore>((set, get) => {
     };
 
     const write = async (path: string, data: string | File | Blob) => {
+        if (!APP_CONFIG.PUTER_FS_ENABLED) return undefined;
         const puter = getPuter();
         if (!puter) {
             setError("Puter.js not available");
@@ -275,6 +277,7 @@ export const usePuterStore = create<PuterStore>((set, get) => {
     };
 
     const readDir = async (path: string) => {
+        if (!APP_CONFIG.PUTER_FS_ENABLED) return undefined;
         const puter = getPuter();
         if (!puter) {
             setError("Puter.js not available");
@@ -284,6 +287,7 @@ export const usePuterStore = create<PuterStore>((set, get) => {
     };
 
     const readFile = async (path: string) => {
+        if (!APP_CONFIG.PUTER_FS_ENABLED) return undefined;
         const puter = getPuter();
         if (!puter) {
             setError("Puter.js not available");
@@ -293,6 +297,7 @@ export const usePuterStore = create<PuterStore>((set, get) => {
     };
 
     const upload = async (files: File[] | Blob[]) => {
+        if (!APP_CONFIG.PUTER_FS_ENABLED) return undefined;
         const puter = getPuter();
         if (!puter) {
             setError("Puter.js not available");
@@ -302,6 +307,7 @@ export const usePuterStore = create<PuterStore>((set, get) => {
     };
 
     const deleteFile = async (path: string) => {
+        if (!APP_CONFIG.PUTER_FS_ENABLED) return;
         const puter = getPuter();
         if (!puter) {
             setError("Puter.js not available");
@@ -316,6 +322,7 @@ export const usePuterStore = create<PuterStore>((set, get) => {
         testMode?: boolean,
         options?: PuterChatOptions
     ) => {
+        if (!APP_CONFIG.PUTER_AI_ENABLED) return undefined;
         const puter = getPuter();
         if (!puter) {
             setError("Puter.js not available");
@@ -328,6 +335,7 @@ export const usePuterStore = create<PuterStore>((set, get) => {
     };
 
     const feedback = async (path: string, message: string) => {
+        if (!APP_CONFIG.PUTER_AI_ENABLED) return undefined;
         const puter = getPuter();
         if (!puter) {
             setError("Puter.js not available");
@@ -355,6 +363,7 @@ export const usePuterStore = create<PuterStore>((set, get) => {
     };
 
     const img2txt = async (image: string | File | Blob, testMode?: boolean) => {
+        if (!APP_CONFIG.PUTER_AI_ENABLED) return undefined;
         const puter = getPuter();
         if (!puter) {
             setError("Puter.js not available");
@@ -364,6 +373,7 @@ export const usePuterStore = create<PuterStore>((set, get) => {
     };
 
     const getKV = async (key: string) => {
+        if (!APP_CONFIG.PUTER_KV_ENABLED) return undefined;
         const puter = getPuter();
         if (!puter) {
             setError("Puter.js not available");
@@ -373,6 +383,7 @@ export const usePuterStore = create<PuterStore>((set, get) => {
     };
 
     const setKV = async (key: string, value: string) => {
+        if (!APP_CONFIG.PUTER_KV_ENABLED) return undefined;
         const puter = getPuter();
         if (!puter) {
             setError("Puter.js not available");
@@ -382,6 +393,7 @@ export const usePuterStore = create<PuterStore>((set, get) => {
     };
 
     const deleteKV = async (key: string) => {
+        if (!APP_CONFIG.PUTER_KV_ENABLED) return undefined;
         const puter = getPuter();
         if (!puter) {
             setError("Puter.js not available");
@@ -391,6 +403,7 @@ export const usePuterStore = create<PuterStore>((set, get) => {
     };
 
     const listKV = async (pattern: string, returnValues?: boolean) => {
+        if (!APP_CONFIG.PUTER_KV_ENABLED) return undefined;
         const puter = getPuter();
         if (!puter) {
             setError("Puter.js not available");
@@ -403,6 +416,7 @@ export const usePuterStore = create<PuterStore>((set, get) => {
     };
 
     const flushKV = async () => {
+        if (!APP_CONFIG.PUTER_KV_ENABLED) return false;
         const puter = getPuter();
         if (!puter) {
             setError("Puter.js not available");

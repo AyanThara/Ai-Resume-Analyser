@@ -322,6 +322,7 @@ export function createDeterministicFeedback(
     overallScore: atsResult.overallScore,
     ATS: {
       score: atsResult.atsScore,
+      breakdown: atsResult.breakdown,
       tips: atsTips.length > 0 ? atsTips : [{ type: "good", tip: "Balanced ATS profile." }],
     },
     toneAndStyle: {
@@ -340,5 +341,6 @@ export function createDeterministicFeedback(
       score: skillsScore,
       tips: skillsTips,
     },
+    atsResult,
   };
 }
