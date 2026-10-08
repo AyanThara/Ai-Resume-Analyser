@@ -6,6 +6,7 @@
     "build": "react-router build",
     "dev": "react-router dev",
     "start": "react-router-serve ./build/server/index.js",
+    "test": "npx tsx app/lib/atsEngine.test.ts && npx tsx app/lib/jdParser.test.ts && npx tsx app/lib/interactiveRescorer.test.ts && npx tsx app/lib/dashboardRender.test.ts && npx tsx app/lib/improvementTargets.test.ts",
     "typecheck": "react-router typegen && tsc"
   },
   "dependencies": {

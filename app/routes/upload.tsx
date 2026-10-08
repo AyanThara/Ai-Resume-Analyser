@@ -10,6 +10,94 @@ import {prepareInstructions} from "../../constants";
 import {extractTextFromPdf} from "~/lib/pdfTextExtractor";
 import {calculateAtsScore} from "~/lib/atsEngine";
 
+/**
+ * Safely clean up stale resume:* entries to prevent browser storage quota issues.
+ * Only removes keys starting with 'resume:'. Never deletes unrelated keys.
+ */
+function cleanupStaleResumeStorage(maxToKeep: number = 5) {
+    if (typeof window === 'undefined') return;
+
+    // 1. Clean up localStorage
+    try {
+        const resumeEntries: { key: string; timestamp: number; size: number }[] = [];
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && key.startsWith('resume:')) {
+                const raw = localStorage.getItem(key) || '';
+                let timestamp = 0;
+                try {
+                    const parsed = JSON.parse(raw);
+                    if (parsed.createdAt) {
+                        timestamp = new Date(parsed.createdAt).getTime();
+                    }
+                } catch {
+                    timestamp = 0;
+                }
+                resumeEntries.push({ key, timestamp, size: raw.length });
+            }
+        }
+
+        // Purge any oversized legacy entries (> 100 KB) that might contain old base64 images
+        for (const entry of resumeEntries) {
+            if (entry.size > 100 * 1024) {
+                console.log(`[STORAGE] Purging oversized legacy entry: ${entry.key} (${Math.round(entry.size / 1024)} KB)`);
+                localStorage.removeItem(entry.key);
+            }
+        }
+
+        // Keep at most maxToKeep most recent entries in localStorage
+        const validRemaining: { key: string; timestamp: number }[] = [];
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && key.startsWith('resume:')) {
+                let timestamp = 0;
+                try {
+                    const parsed = JSON.parse(localStorage.getItem(key) || '{}');
+                    timestamp = parsed.createdAt ? new Date(parsed.createdAt).getTime() : 0;
+                } catch {}
+                validRemaining.push({ key, timestamp });
+            }
+        }
+
+        if (validRemaining.length >= maxToKeep) {
+            validRemaining.sort((a, b) => a.timestamp - b.timestamp);
+            const toPurge = validRemaining.length - maxToKeep + 1;
+            for (let i = 0; i < toPurge; i++) {
+                console.log(`[STORAGE] Purging oldest resume entry to preserve quota: ${validRemaining[i].key}`);
+                localStorage.removeItem(validRemaining[i].key);
+            }
+        }
+    } catch (err) {
+        console.warn('[STORAGE] Safe localStorage cleanup warning:', err);
+    }
+
+    // 2. Also clean up sessionStorage stale entries
+    try {
+        const sessionResumeKeys: { key: string; timestamp: number }[] = [];
+        for (let i = 0; i < sessionStorage.length; i++) {
+            const key = sessionStorage.key(i);
+            if (key && key.startsWith('resume:')) {
+                let timestamp = 0;
+                try {
+                    const parsed = JSON.parse(sessionStorage.getItem(key) || '{}');
+                    timestamp = parsed.createdAt ? new Date(parsed.createdAt).getTime() : 0;
+                } catch {}
+                sessionResumeKeys.push({ key, timestamp });
+            }
+        }
+
+        if (sessionResumeKeys.length >= maxToKeep) {
+            sessionResumeKeys.sort((a, b) => a.timestamp - b.timestamp);
+            const toPurge = sessionResumeKeys.length - maxToKeep + 1;
+            for (let i = 0; i < toPurge; i++) {
+                sessionStorage.removeItem(sessionResumeKeys[i].key);
+            }
+        }
+    } catch (err) {
+        console.warn('[STORAGE] Safe sessionStorage cleanup warning:', err);
+    }
+}
+
 const Upload = () => {
     const { auth, isLoading, fs, ai, kv } = usePuterStore();
     const navigate = useNavigate();
@@ -209,7 +297,14 @@ ${prepareInstructions({ jobTitle, jobDescription })}`;
 
             // Stage 8a: Storage Persistence - Local (sessionStorage/localStorage)
             currentStage = 'Stage 8a: Local Storage Persistence';
+            const s8aStart = performance.now();
+
+            // Safe cleanup of stale resume:* entries to maintain quota
+            cleanupStaleResumeStorage(5);
+
             const uuid = generateUUID();
+            // Build lightweight payload: persist ONLY what is required to reconstruct the analysis.
+            // Exclude large base64 image data URLs from the persisted analysis object.
             const data = {
                 id: uuid,
                 companyName: companyName.trim(),
@@ -218,19 +313,72 @@ ${prepareInstructions({ jobTitle, jobDescription })}`;
                 resumeText,
                 atsResult,
                 feedback: finalFeedback,
-                imageUrl: imageResult.imageUrl || '',
+                createdAt: new Date().toISOString(),
             };
-            const serializedData = JSON.stringify(data);
+            const serializedPayload = JSON.stringify(data);
+            const payloadSizeKb = Math.round(serializedPayload.length / 1024);
+            console.log(`[STORAGE] Analysis payload size: ${payloadSizeKb} KB`);
 
-            const s8aStart = performance.now();
+            let sessionStorageSuccess = false;
+            let localStorageSuccess = false;
+
+            // Preferred: Write to sessionStorage for the current analysis session
             try {
-                localStorage.setItem(`resume:${uuid}`, serializedData);
-                sessionStorage.setItem(`resume:${uuid}`, serializedData);
+                sessionStorage.setItem(`resume:${uuid}`, serializedPayload);
+                sessionStorageSuccess = true;
+                console.log(`[STORAGE] Successfully saved to sessionStorage for resume:${uuid}`);
             } catch (storageErr) {
-                console.warn('[PIPELINE] Local storage write warning:', storageErr);
+                console.warn('[STORAGE] sessionStorage write warning:', storageErr);
             }
+
+            // Fallback: Write to localStorage for persistence across browser sessions
+            try {
+                localStorage.setItem(`resume:${uuid}`, serializedPayload);
+                localStorageSuccess = true;
+                console.log(`[STORAGE] Successfully saved to localStorage for resume:${uuid}`);
+            } catch (storageErr) {
+                console.warn('[STORAGE] localStorage write warning (quota exceeded or disabled):', storageErr);
+            }
+
+            // Storage verification: must happen AFTER the final lightweight payload is written
+            let savedRaw: string | null = null;
+            if (typeof window !== 'undefined') {
+                // Preferred: check sessionStorage first, then localStorage
+                savedRaw = sessionStorage.getItem(`resume:${uuid}`) || localStorage.getItem(`resume:${uuid}`);
+            }
+
+            let verifiedData: any = null;
+            if (savedRaw) {
+                try {
+                    verifiedData = JSON.parse(savedRaw);
+                } catch (parseErr) {
+                    console.warn('[STORAGE] Failed to parse verified storage data:', parseErr);
+                }
+            }
+
+            const isPersisted = Boolean(
+                verifiedData &&
+                typeof verifiedData.resumeText === 'string' &&
+                verifiedData.resumeText.trim().length > 0 &&
+                typeof verifiedData.jobDescription === 'string' &&
+                verifiedData.jobDescription.trim().length > 0 &&
+                verifiedData.atsResult &&
+                typeof verifiedData.atsResult === 'object'
+            );
+
+            if (!isPersisted) {
+                console.error('[STORAGE] Storage verification failed: neither sessionStorage nor localStorage contains valid analysis data.');
+                throw new Error("Analysis completed, but the result could not be saved in browser storage. Please try again.");
+            }
+
             const s8aEnd = performance.now();
-            recordStage('8a. Local Storage (localStorage/sessionStorage)', true, s8aStart, s8aEnd, `Size: ~${Math.round(serializedData.length / 1024)} KB`);
+            recordStage(
+                '8a. Local Storage (sessionStorage/localStorage)',
+                true,
+                s8aStart,
+                s8aEnd,
+                `Verified persistence (${payloadSizeKb} KB) | sessionStorage: ${sessionStorageSuccess ? 'OK' : 'FAIL'} | localStorage: ${localStorageSuccess ? 'OK' : 'FAIL'}`
+            );
 
             // Stage 8b: Storage Persistence - Puter KV (Optional feature flag)
             currentStage = 'Stage 8b: Puter KV Storage';
@@ -238,7 +386,7 @@ ${prepareInstructions({ jobTitle, jobDescription })}`;
             let kvNotes = 'Bypassed (PUTER_KV_ENABLED = false)';
             if (APP_CONFIG.PUTER_KV_ENABLED) {
                 try {
-                    await kv.set(`resume:${uuid}`, serializedData);
+                    await kv.set(`resume:${uuid}`, serializedPayload);
                     kvNotes = 'KV set succeeded';
                 } catch (kvErr) {
                     kvNotes = `KV set failed: ${extractErrorMessage(kvErr)}`;
@@ -276,7 +424,11 @@ ${prepareInstructions({ jobTitle, jobDescription })}`;
         } catch (err) {
             console.error(`[PIPELINE FAILURE] Failed during stage "${currentStage}":`, err);
             const actualError = extractErrorMessage(err);
-            setErrorMessage(`Analysis failed: [${currentStage}] ${actualError}`);
+            if (actualError === "Analysis completed, but the result could not be saved in browser storage. Please try again.") {
+                setErrorMessage(actualError);
+            } else {
+                setErrorMessage(`Analysis failed: [${currentStage}] ${actualError}`);
+            }
         } finally {
             setIsProcessing(false);
             setStatusText('');
